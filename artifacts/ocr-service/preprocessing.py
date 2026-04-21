@@ -146,6 +146,38 @@ def sharpen(image: np.ndarray) -> np.ndarray:
 def preprocess_for_ocr(image: np.ndarray, aggressive: bool = False) -> np.ndarray:
     """
     Full preprocessing pipeline optimized for prescription OCR.
+    Now includes smart upscaling for low-resolution handwritten images.
+    """
+    # Step 1: Smart Upscaling (Handwriting needs resolution)
+    h, w = image.shape[:2]
+    target_height = 2048 # High resolution for better handwriting loops
+    if h < target_height:
+        scale = target_height / h
+        image = cv2.resize(image, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+        # Apply light sharpening after upscale
+        image = sharpen(image)
+
+    # Step 2: Remove borders / crop to document
+    processed = remove_borders(image)
+
+    # Step 3: Denoise (before any enhancement to avoid amplifying noise)
+    # Lower strength for upscaled image to preserve loops
+    processed = denoise(processed, strength=5)
+
+    # Step 4: CLAHE contrast enhancement on grayscale
+    gray = apply_clahe(processed, clip_limit=4.0, tile_size=12)
+
+    # Step 5: Sharpen text edges
+    gray = sharpen(gray)
+
+    # Step 6: Deskew
+    gray = deskew(gray)
+
+    # Step 7: If aggressive mode, apply adaptive thresholding
+    if aggressive:
+        gray = adaptive_threshold(gray, block_size=31, c=8)
+
+    # Step 8: Convert back to BGR (docTR expects 3-channel)
 
     Args:
         image: Input BGR or grayscale image (numpy array).
@@ -207,3 +239,31 @@ def preprocess_region(region: np.ndarray) -> np.ndarray:
 
     # Convert to RGB for TrOCR
     return cv2.cvtColor(enhanced, cv2.COLOR_GRAY2RGB)
+
+def preprocess_for_tesseract(image: np.ndarray) -> np.ndarray:
+    """
+    Highly aggressive preprocessing specifically tuned for Tesseract OCR.
+    Tesseract performs poorly on noisy/low-contrast images compared to docTR.
+    """
+    # 1. Grayscale
+    gray = to_grayscale(image)
+    
+    # 2. Resize to 300 DPI equivalent (approx 2x for standard phone photos)
+    h, w = gray.shape[:2]
+    if h < 2000:
+        scale = 2000 / h
+        gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+        
+    # 3. Denoise
+    gray = cv2.fastNlMeansDenoising(gray, None, h=10, templateWindowSize=7, searchWindowSize=21)
+    
+    # 4. Aggressive Contrast (CLAHE)
+    clahe = cv2.createCLAHE(clipLimit=5.0, tileGridSize=(8, 8))
+    gray = clahe.apply(gray)
+    
+    # 5. Adaptive Thresholding (Binarization - critical for Tesseract)
+    binary = cv2.adaptiveThreshold(
+        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 15
+    )
+    
+    return binary

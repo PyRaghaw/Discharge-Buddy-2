@@ -25,6 +25,8 @@ _trocr_processor = None
 _trocr_model = None
 
 # Confidence threshold: words below this are sent to TrOCR for refinement
+# Increased to 0.75 to be more aggressive with handwriting models
+TROCR_REFINEMENT_THRESHOLD = 0.75
 TROCR_REFINEMENT_THRESHOLD = 0.65
 
 
@@ -244,6 +246,29 @@ def run_ocr(image: np.ndarray, refine_with_trocr: bool = True) -> OCRResult:
                             bbox=line_bbox,
                             low_confidence=any(w.confidence < 0.7 for w in line_words),
                         ))
+
+        # Overall stats for docTR
+        doctr_text = "\n".join(line.text for line in all_lines)
+        overall_confidence = float(np.mean([w.confidence for w in all_words_flat])) if all_words_flat else 0.0
+
+        # --- Tesseract Secondary Pass ---
+        logger.info("Running Tesseract secondary pass...")
+        tesseract_text = ""
+        try:
+            import pytesseract
+            import cv2
+            from preprocessing import preprocess_for_tesseract
+            
+            # Use the new aggressive preprocessing specifically for Tesseract
+            tess_image = preprocess_for_tesseract(image)
+            tesseract_text = pytesseract.image_to_string(tess_image).strip()
+            logger.info("Tesseract pass completed.")
+        except Exception as tess_err:
+            logger.warning(f"Tesseract pass failed, continuing with docTR only: {tess_err}")
+            tesseract_text = "[Tesseract failed or unavailable]"
+
+        # Combine both outputs for the AI
+        full_text = f"--- docTR Output ---\n{doctr_text}\n\n--- Tesseract Output ---\n{tesseract_text}"
 
         # Overall stats
         full_text = "\n".join(line.text for line in all_lines)

@@ -108,6 +108,29 @@ export interface DrugInteraction {
   description: string;
 }
 
+export interface ExtractedMedicine {
+  name: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  timing: string;
+  notes: string;
+  confidence: number;
+  low_confidence: boolean;
+  simplifiedInstructions?: string;
+  times?: string[];
+}
+
+export interface PrescriptionAnalysisResult {
+  medicines: ExtractedMedicine[];
+  general_instructions: string;
+  explanation: string;
+  warnings: string[];
+  overall_confidence: number;
+  ocr_source: string;
+  processing_note: string;
+}
+
 const ALL_ACHIEVEMENTS: Achievement[] = [
   { id: "first_dose", title: "First Step", description: "Take your first medicine", icon: "💊", xpReward: 50 },
   { id: "streak_3", title: "On a Roll", description: "3-day adherence streak", icon: "🔥", xpReward: 75 },
@@ -188,7 +211,7 @@ interface AppContextType {
   setHapticsEnabled: (val: boolean) => void;
   triggerEmergency: () => void;
   setLanguage: (lang: Language) => void;
-  addPrescription: (imageUri: string) => Promise<void>;
+  addPrescription: (imageBase64: string) => Promise<PrescriptionAnalysisResult>;
   addJournalEntry: (entry: JournalEntry) => void;
   awardXP: (amount: number) => void;
   unlockAchievement: (id: string) => void;
@@ -409,6 +432,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     console.log("EMERGENCY ACTUALLY TRIGGERED AND SENT TO BACKEND");
   };
 
+  const addPrescription = async (imageBase64: string): Promise<PrescriptionAnalysisResult> => {
+    setIsProcessingPrescription(true);
+    try {
+      const result = await dataProvider.scanPrescription(imageBase64);
+      unlockAchievement("scan_master");
+      return result;
+    } finally {
+      setIsProcessingPrescription(false);
+    }
   const addPrescription = async (_imageUri: string) => {
     // Prescription scanning is now handled directly in scan.tsx via /api/ocr/scan.
     // This function is kept for interface compatibility.

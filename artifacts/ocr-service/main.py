@@ -100,6 +100,14 @@ def decode_base64_image(b64_string: str) -> np.ndarray:
         b64_string = b64_string.split(",", 1)[1]
 
     # Decode base64 to bytes
+    # Ensure the string only contains valid base64 characters to avoid Python's decode error
+    try:
+        # Strip any whitespace and ensure it's treated as ASCII
+        b64_string = "".join(b64_string.split())
+        image_bytes = base64.b64decode(b64_string.encode('ascii', errors='ignore'))
+    except Exception as e:
+        logger.error(f"Base64 decode failed: {str(e)}")
+        raise ValueError(f"Failed to decode base64: {str(e)}")
     image_bytes = base64.b64decode(b64_string)
 
     # Convert to PIL Image, then to numpy array

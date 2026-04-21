@@ -1,5 +1,6 @@
 import { customFetch } from "@workspace/api-client-react";
 import type { IDataProvider } from "./types";
+import type { Medicine, DoseLog, SymptomLog, FollowUp, JournalEntry, Patient, PrescriptionAnalysisResult } from "./AppContext";
 import type { Medicine, DoseLog, SymptomLog, FollowUp, JournalEntry, Patient } from "./AppContext";
 
 export class ApiProvider implements IDataProvider {
@@ -103,6 +104,10 @@ export class ApiProvider implements IDataProvider {
     return res.patients || [];
   }
 
+  async scanPrescription(imageBase64: string): Promise<PrescriptionAnalysisResult> {
+    return await customFetch("/api/ocr/scan", {
+      method: "POST",
+      body: JSON.stringify({ imageBase64 }),
   async addMedicine(medicine: Medicine): Promise<void> {
     await customFetch("/api/medicines", {
       method: "POST",

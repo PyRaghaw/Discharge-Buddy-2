@@ -1,3 +1,4 @@
+import type { Medicine, DoseLog, SymptomLog, FollowUp, JournalEntry, Patient, PrescriptionAnalysisResult } from "./AppContext";
 import type { Medicine, DoseLog, SymptomLog, FollowUp, JournalEntry, Patient } from "./AppContext";
 
 export interface IDataProvider {
@@ -20,5 +21,6 @@ export interface IDataProvider {
 
   triggerEmergency(): Promise<void>;
   getLinkedPatients(): Promise<Patient[]>;
+  scanPrescription(imageBase64: string): Promise<PrescriptionAnalysisResult>;
   addMedicine(medicine: Medicine): Promise<void>;
 }
